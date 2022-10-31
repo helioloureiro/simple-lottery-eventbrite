@@ -132,7 +132,8 @@ class RunLottery:
                     self.not_in_the_room.append(winner)
                 if tag == "[Ok]":
                     rounds-=1
-        dlg.msgbox(f"Saving result into {self.resultsLog}")
+        msg_width = len(self.resultsLog) + 4
+        dlg.msgbox(f"Saving result into {self.resultsLog}", width=msg_width)
         self.dump_results()
 
 
