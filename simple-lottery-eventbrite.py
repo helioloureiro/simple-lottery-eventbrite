@@ -13,7 +13,11 @@ import sys
 SOURCECODE = "https://github.com/helioloureiro/simple-lottery-eventbrite"
 
 def generate_output_filename() -> str:
+    '''
+    dump the results in a file to use later (reach the winners)
+    '''
     return time.strftime("lottery-result-%Y-%m-%d-%H:%M:%S.log")
+
 class RunLottery:
     def __init__(self, csvfile):
         self.winners = []
@@ -22,7 +26,6 @@ class RunLottery:
         self.resultsLog = generate_output_filename()
 
         self.participants = self.generate_name_email_dict()
-        # print(participants)
 
         self.participants_names = list(self.participants.keys())
 
@@ -42,6 +45,11 @@ class RunLottery:
         return name_email_dict
 
     def get_a_winner(self, listNames):
+        '''
+        It receives an array with name and picks one name randomly.
+        Then verifies whether already in winners list or not in the room list.
+        In case positive, adds the candidate into the winners list and returns result.
+        '''
         while True:
             candidate = random.choice(listNames)
             if not candidate in self.winners and not candidate in self.not_in_the_room:
@@ -49,13 +57,20 @@ class RunLottery:
                 return candidate
 
     def dump_results(self):
-        outputFilename = generate_output_filename()
+        ''''
+        Save the full name and email to reach the winners later.
+        '''
+        outputFilename = self.resultsLog
         with open(outputFilename, 'w') as dest:
             for fullName in self.winners:
                 email = self.participants[fullName]
                 dest.write(f'{fullName}, {email}\n')
 
     def protected_email(self, person):
+        ''''
+        To display the person's email, but not totally open.  Just the first
+        5 characters.
+        '''
         email = self.participants[person]
         protected = email[:5]
         for c in email[5:]:
@@ -73,7 +88,10 @@ class RunLottery:
             print(f'{i}) {winner} {safe_email}')
         self.dump_results()
 
-    def confirm(self):
+    def run_dialog(self):
+        ''''
+        To run the lottery using dialog interface to confirm.
+        '''
         dlg = Dialog(dialog="dialog")
         msg_width = len(SOURCECODE) + 4
         dlg.msgbox(f"Welcome to the simple lottery.\nSource code: {SOURCECODE} ", width=msg_width)
@@ -101,7 +119,8 @@ class RunLottery:
 
         while rounds > 0:
             winner = self.get_a_winner(self.participants_names)
-            code, tag = dlg.menu(f"{winner}",
+            email = self.protected_email(winner)
+            code, tag = dlg.menu(f"{winner} <{email}>",
                         choices=[("[Ok]", "Person is in the room"),
                                 ("[Try again]", "Not found, so let's try again")])
             if code == dlg.OK:
@@ -111,7 +130,7 @@ class RunLottery:
                     self.not_in_the_room.append(winner)
                 if tag == "[Ok]":
                     rounds-=1
-        dlg.msgbox("Saving result into logs")
+        dlg.msgbox(f"Saving result into {self.resultsLog}")
         self.dump_results()
 
 
@@ -166,7 +185,7 @@ def start_webserver():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="It uses an Eventbrite's CSV as input and generate an random lottery person")
     parser.add_argument("--web", action="store_true", help="It starts web interface (port 8080)")
-    parser.add_argument("--confirm", action="store_true", help="It confirms each winner")
+    parser.add_argument("--dialog", action="store_true", help="It runs via dialog")
     parser.add_argument("--csvfile", help="Eventbrite's CSV attendant summary report")
     args = parser.parse_args()
     if args.csvfile is None:
@@ -176,7 +195,7 @@ if __name__ == '__main__':
         start_webserver()
         sys.exit(0)
     lottery = RunLottery(csvfile=args.csvfile)
-    if args.confirm:
-        lottery.confirm()
+    if args.dialog:
+        lottery.run_dialog()
         sys.exit(0)
     lottery.run()
