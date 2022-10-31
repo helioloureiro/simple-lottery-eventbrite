@@ -24,12 +24,14 @@ class RunLottery:
         self.not_in_the_room = []
         self.csvfile = csvfile
         self.resultsLog = generate_output_filename()
-
         self.participants = self.generate_name_email_dict()
-
         self.participants_names = list(self.participants.keys())
 
     def generate_name_email_dict(self):
+        '''
+        It reads the Eventbrite's CSV and creates a dictionary:
+        full name -> email
+        '''
         name_email_dict = {}
         with open(self.csvfile, encoding='utf-8') as csvFile:
             csvreader = csv.DictReader(csvFile)
