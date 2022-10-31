@@ -1,27 +1,24 @@
 #! /usr/bin/env python3
 
-import re
+from importlib import import_module
 import random
 from typing import Dict, List
 from  http.server import BaseHTTPRequestHandler, HTTPServer
 import argparse
 import time
-import html
 import csv
-
-
-save_output = False
-output_filename = None
+from dialog import Dialog
+import sys
 
 SOURCECODE = "https://github.com/helioloureiro/simple-lottery-eventbrite"
 
 def generate_output_filename() -> str:
     return time.strftime("lottery-result-%Y-%m-%d-%H:%M:%S.log")
 class RunLottery:
-    def __init__(self, csvfile, outputFlag=False):
+    def __init__(self, csvfile):
         self.winners = []
+        self.not_in_the_room = []
         self.csvfile = csvfile
-        self.outputFlag = outputFlag
         self.resultsLog = generate_output_filename()
 
         self.participants = self.generate_name_email_dict()
@@ -37,15 +34,17 @@ class RunLottery:
                 fullName = row['Name']
                 email = row['Email']
                 if fullName in name_email_dict:
-                    raise Exception(f'The name {fullName} already exists')
+                    # raise Exception(f'The name {fullName} already exists')
+                    print(f'{fullName} is already in the list')
+                    continue
                 name_email_dict[fullName] = email
-                print(f'Added {fullName} <{email}>')
+                #print(f'Added {fullName} <{email}>')
         return name_email_dict
 
     def get_a_winner(self, listNames):
         while True:
             candidate = random.choice(listNames)
-            if not candidate in self.winners:
+            if not candidate in self.winners and not candidate in self.not_in_the_room:
                 self.winners.append(candidate)
                 return candidate
 
@@ -74,9 +73,55 @@ class RunLottery:
             print(f'{i}) {winner} {safe_email}')
         self.dump_results()
 
+    def confirm(self):
+        dlg = Dialog(dialog="dialog")
+        msg_width = len(SOURCECODE) + 4
+        dlg.msgbox(f"Welcome to the simple lottery.\nSource code: {SOURCECODE} ", width=msg_width)
+
+        rounds = 0
+        while rounds == 0:
+            code, result = dlg.inputbox("How many rounds?")
+            if code == dlg.OK:
+                try:
+                    rounds = int(result)
+                except ValueError:
+                    pass
+
+        dlg.msgbox(f"Running for {rounds} rounds")
+
+        seed = 0
+        while seed == 0:
+            code, result = dlg.inputbox("Enter a number for seed random number generator")
+            if code == dlg.OK:
+                try:
+                    seed = int(result)
+                    random.seed(seed)
+                except ValueError:
+                    pass
+
+        while rounds > 0:
+            winner = self.get_a_winner(self.participants_names)
+            code, tag = dlg.menu(f"{winner}",
+                        choices=[("[Ok]", "Person is in the room"),
+                                ("[Try again]", "Not found, so let's try again")])
+            if code == dlg.OK:
+                if tag == "[Try again]":
+                    # remove person
+                    self.winners.remove(winner)
+                    self.not_in_the_room.append(winner)
+                if tag == "[Ok]":
+                    rounds-=1
+        dlg.msgbox("Saving result into logs")
+        self.dump_results()
+
+
+
+
 
 def start_webserver():
     "src: https://www.programcreek.com/python/example/103649/http.server.BaseHTTPRequestHandler"
+    print('not implemented yet')
+    sys.exit(1)
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             self.send_response(200)
@@ -121,10 +166,17 @@ def start_webserver():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="It uses an Eventbrite's CSV as input and generate an random lottery person")
     parser.add_argument("--web", action="store_true", help="It starts web interface (port 8080)")
-    parser.add_argument("--output", action="store_true", help="It enables to save results.")
+    parser.add_argument("--confirm", action="store_true", help="It confirms each winner")
     parser.add_argument("--csvfile", help="Eventbrite's CSV attendant summary report")
     args = parser.parse_args()
     if args.csvfile is None:
         raise Exception("Missing --csvfile")
-    lottery = RunLottery(csvfile=args.csvfile, outputFlag=args.output)
+
+    if args.web:
+        start_webserver()
+        sys.exit(0)
+    lottery = RunLottery(csvfile=args.csvfile)
+    if args.confirm:
+        lottery.confirm()
+        sys.exit(0)
     lottery.run()
